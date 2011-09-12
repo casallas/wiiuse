@@ -341,7 +341,7 @@ int wiiuse_io_read(struct wiimote_t* wm) {
 int wiiuse_io_write(struct wiimote_t* wm, byte* buf, int len) {
 	IOReturn ret;
 
-	if (!wm || WIIMOTE_IS_CONNECTED(wm))
+	if (!wm || !WIIMOTE_IS_CONNECTED(wm))
 		return 0;
 
 	ret = [wm->cchan writeAsync: buf length: len refcon: nil];
