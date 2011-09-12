@@ -32,9 +32,15 @@
 	#include <windows.h>
 #endif
 
-#include <GL/gl.h>
-#include <GL/glu.h>
-#include <GL/glut.h>
+#ifndef __APPLE__
+	#include <GL/gl.h>
+	#include <GL/glu.h>
+	#include <GL/glut.h>
+#else
+	#include <OpenGL/gl.h>
+	#include <OpenGL/glu.h>
+	#include <GLUT/GLUT.h>
+#endif
 #include <SDL.h>
 
 #include <wiiuse.h>
