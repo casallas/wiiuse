@@ -153,7 +153,10 @@ struct wiimote_t** wiiuse_init(int wiimotes) {
 			wm[i]->exp_timeout = WIIMOTE_EXP_TIMEOUT;
 			wm[i]->timeout = wm[i]->normal_timeout;
 		#elif defined(WIIUSE_MAC)
-			/* TODO */
+			/* TODO - verify the initializations */
+			wm[i]->btd = NULL;
+			wm[i]->ichan = NULL;
+			wm[i]->cchan = NULL;
 		#endif
 
 		wm[i]->state = WIIMOTE_INIT_STATES;

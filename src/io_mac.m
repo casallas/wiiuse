@@ -167,7 +167,7 @@ int wiiuse_find(struct wiimote_t** wm, int max_wiimotes, int timeout) {
 
 	// Count the number of already found wiimotes
 	for (i = 0; i < MAX_WIIMOTES; ++i)
-		if (wm[i])
+		if (wm[i] && wm[i]->btd)//check if we've already initialized the bluetooth device
 			found_wiimotes++;
 
 	bth = [[IOBluetoothHostController alloc] init];
@@ -203,7 +203,7 @@ int wiiuse_find(struct wiimote_t** wm, int max_wiimotes, int timeout) {
 
 	en = [[bti foundDevices] objectEnumerator];
 	
-	for (; (i < found_devices) && (found_wiimotes < max_wiimotes); ++i) {
+	for (i=0; (i < found_devices) && (found_wiimotes < max_wiimotes); ++i) {
 			/* found a device */
 			wm[found_wiimotes]->btd = [en nextObject];
 
@@ -271,9 +271,9 @@ static int wiiuse_connect_single(struct wiimote_t* wm, char* address) {
 
 	int i;
 	ConnectBT *cbt = [[ConnectBT alloc] init];
-	[wm->btd openL2CAPChannelSync: wm->cchan
+	[wm->btd openL2CAPChannelSync: &wm->cchan
 		withPSM: kBluetoothL2CAPPSMHIDControl delegate: cbt];
-	[wm->btd openL2CAPChannelSync: wm->ichan
+	[wm->btd openL2CAPChannelSync: &wm->ichan
 		withPSM: kBluetoothL2CAPPSMHIDInterrupt delegate: cbt];
 	if (wm->cchan == NULL || wm->ichan == NULL) {
 		WIIUSE_ERROR("Unable to open L2CAP channels "
