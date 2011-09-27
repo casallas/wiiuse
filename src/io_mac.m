@@ -109,9 +109,14 @@ wiimote * g_wiimotes[MAX_WIIMOTES] = {NULL, NULL, NULL, NULL};
 	memcpy(wm->input, data, length);
 	wm->inputlen = length;
 
-	wiiuse_io_read(wm);
-
-	/*(void)UpdateSystemActivity(UsrActivity);*/
+	//Stop the thread loop since we are already doing polling
+	CFRunLoopStop(CFRunLoopGetCurrent());
+	
+#ifndef __LP64__
+	//This keeps the screen saver from activating, but apparently it's not available in 64 bits
+	(void)UpdateSystemActivity(UsrActivity);
+#endif//TODO look for LP64 equivalent
+	
 }
 
 - (void) l2capChannelClosed: (IOBluetoothL2CAPChannel *) l2capChannel
@@ -121,6 +126,7 @@ wiimote * g_wiimotes[MAX_WIIMOTES] = {NULL, NULL, NULL, NULL};
 
 	int i;
 
+	//Look for the corresponding wm
 	for (i = 0; i < MAX_WIIMOTES; i++) {
 		if (g_wiimotes[i] == NULL)
 			continue;
@@ -132,10 +138,22 @@ wiimote * g_wiimotes[MAX_WIIMOTES] = {NULL, NULL, NULL, NULL};
 		WIIUSE_WARNING("Channel for unknown wiimote was closed");
 		return;
 	}
+	else{
+		//TODO Not sure if this should disconnect the wiimote or just set channels to nil
+		//wiiuse_disconnect(wm);
 
-	WIIUSE_WARNING("Lost channel to wiimote %i", wm->unid);
-
-	wiiuse_disconnect(wm);
+		if (l2capChannel == wm->cchan)
+		{
+			wm->cchan = nil;
+			WIIUSE_WARNING("Lost control channel to wiimote %i", wm->unid);
+		}
+		if (l2capChannel == wm->ichan)
+		{
+			wm->ichan = nil;
+			WIIUSE_WARNING("Lost input channel to wiimote %i", wm->unid);
+		}
+	}
+	
 }
 @end
 
@@ -193,6 +211,7 @@ int wiiuse_find(struct wiimote_t** wm, int max_wiimotes, int timeout) {
 	else
 		WIIUSE_ERROR("Unable to do bluetooth discovery");
 
+	//Start running the thread loop, this way the bluetooth device inquiry will start, reporting to the SearchBT delegate
 	CFRunLoopRun();
 
 	[bti stop];
@@ -273,9 +292,11 @@ static int wiiuse_connect_single(struct wiimote_t* wm, char* address) {
 	ConnectBT *cbt = [[ConnectBT alloc] init];
 	[wm->btd openL2CAPChannelSync: &wm->cchan
 		withPSM: kBluetoothL2CAPPSMHIDControl delegate: cbt];
+	
 	[wm->btd openL2CAPChannelSync: &wm->ichan
 		withPSM: kBluetoothL2CAPPSMHIDInterrupt delegate: cbt];
-	if (wm->cchan == NULL || wm->ichan == NULL) {
+	
+	if (wm->cchan == nil || wm->ichan == nil) {
 		WIIUSE_ERROR("Unable to open L2CAP channels "
 			"for wiimote %i", wm->unid);
 		[cbt release];
@@ -319,11 +340,21 @@ void wiiuse_disconnect(struct wiimote_t* wm) {
 		if (wm == g_wiimotes[i])
 			g_wiimotes[i] = NULL;
 	}
-	[wm->btd closeConnection];
-	[wm->btd release];
-	wm->btd = NULL;
-	wm->cchan = NULL;
-	wm->ichan = NULL;
+	if (wm->cchan!=nil) {
+		[wm->cchan setDelegate:nil];
+		[wm->cchan closeChannel];
+		wm->cchan = nil;
+	}
+	if (wm->ichan!=nil) {
+		[wm->ichan setDelegate:nil];
+		[wm->ichan closeChannel];
+		wm->ichan = nil;
+	}
+	if (wm->btd!=nil) {
+		[wm->btd closeConnection];
+		[wm->btd release];
+		wm->btd = nil;
+	}
 
 	wm->event = WIIUSE_NONE;
 
@@ -333,8 +364,27 @@ void wiiuse_disconnect(struct wiimote_t* wm) {
 
 
 int wiiuse_io_read(struct wiimote_t* wm) {
-	/* not used */
-	return 0;
+	int bytes;
+	
+	if (!WIIMOTE_IS_CONNECTED(wm))
+		return 0;
+	
+	//Run the thread loop for 1 second, so that ConnectBT may catch the read data events
+	CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1, true);
+	
+	//There's no input return
+	if (wm->inputlen == 0)
+		return 0;
+	
+	//Copy the input to the event buffer
+	bytes = wm->inputlen;
+	memcpy(wm->event_buf, wm->input, bytes);
+	wm->inputlen = 0;
+	
+	if (wm->event_buf[0] == '\0')
+		bytes = 0;
+	
+	return bytes;
 }
 
 

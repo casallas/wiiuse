@@ -153,10 +153,10 @@ struct wiimote_t** wiiuse_init(int wiimotes) {
 			wm[i]->exp_timeout = WIIMOTE_EXP_TIMEOUT;
 			wm[i]->timeout = wm[i]->normal_timeout;
 		#elif defined(WIIUSE_MAC)
-			/* TODO - verify the initializations */
-			wm[i]->btd = NULL;
-			wm[i]->ichan = NULL;
-			wm[i]->cchan = NULL;
+			wm[i]->btd = nil;
+			wm[i]->ichan = nil;
+			wm[i]->cchan = nil;
+			wm[i]->inputlen = 0;
 		#endif
 
 		wm[i]->state = WIIMOTE_INIT_STATES;
@@ -199,7 +199,11 @@ void wiiuse_disconnected(struct wiimote_t* wm) {
 	#elif defined(WIIUSE_WIN)
 		wm->dev_handle = 0;
 	#elif defined(WIIUSE_MAC)
-		/* TODO */
+		/* TODO isn't this already done in wiiuse_disconnect ? */
+		wm->cchan = nil;
+		wm->ichan = nil;
+		wm->btd = nil;
+		wm->inputlen = 0;
 	#endif
 
 	wm->leds = 0;
