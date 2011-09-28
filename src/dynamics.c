@@ -36,14 +36,9 @@
  */
 
 #include "dynamics.h"
-#include "ir.h"
 
-#include <stdlib.h>
-#include <math.h>
-
-#ifdef WIN32
-	#include <float.h>
-#endif
+#include <math.h>                       /* for atan2f, atanf, sqrt */
+#include <stdlib.h>                     /* for abs */
 
 
 /**

@@ -34,14 +34,13 @@
  *	This file is an example of how to use the wiiuse library.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <stdio.h>                      /* for printf */
 
 #ifndef WIN32
-	#include <unistd.h>
+	#include <unistd.h>                     /* for usleep */
 #endif
 
-#include "wiiuse.h"
+#include "wiiuse.h"                     /* for wiimote_t, classic_ctrl_t, etc */
 
 
 #define MAX_WIIMOTES				4
@@ -181,6 +180,15 @@ void handle_event(struct wiimote_t* wm) {
 		printf("Guitar whammy bar:          %f\n", gh3->whammy_bar);
 		printf("Guitar joystick angle:      %f\n", gh3->js.ang);
 		printf("Guitar joystick magnitude:  %f\n", gh3->js.mag);
+	} else if (wm->exp.type == EXP_WII_BOARD) {
+		/* wii balance board */
+		struct wii_board_t* wb = (wii_board_t*)&wm->exp.wb;
+		float total = wb->tl + wb->tr + wb->bl + wb->br;
+		float x = ((wb->tr + wb->br) / total) * 2 - 1;
+		float y = ((wb->tl + wb->tr) / total) * 2 - 1;
+		printf("Weight: %f kg @ (%f, %f)\n", total, x, y);
+		/* printf("Interpolated weight: TL:%f  TR:%f  BL:%f  BR:%f\n", wb->tl, wb->tr, wb->bl, wb->br); */
+		/* printf("Raw: TL:%d  TR:%d  BL:%d  BR:%d\n", wb->rtl, wb->rtr, wb->rbl, wb->rbr); */
 	}
 }
 
@@ -318,8 +326,9 @@ int main(int argc, char** argv) {
 	/*
 	 *	Now set the LEDs and rumble for a second so it's easy
 	 *	to tell which wiimotes are connected (just like the wii does).
+	 *  Add a switch to check which wiimotes have been connected 
+	 *  (else you would light up all the leds if you only have one wiimote connected ;) )
 	 */
-	//Add a switch to check which wiimotes have been connected (else you would light up all the leds if you only have one wiimote connected ;) )
 	switch (connected) {
 		case 4:
 			wiiuse_set_leds(wiimotes[3], WIIMOTE_LED_4);
@@ -333,16 +342,15 @@ int main(int argc, char** argv) {
 			break;
 	}
 	
-	//It doesn't really matter if we make them all rumble and there is only one connected, in that case all the pointers of the array converge
-	wiiuse_rumble(wiimotes[0], 1);
-	wiiuse_rumble(wiimotes[1], 1);
-
 	#ifndef WIN32
 		usleep(200000);
 	#else
 		Sleep(200);
 	#endif
 
+	/* It doesn't really matter if we make them all rumble and there is only one connected, 
+	 * in that case all the pointers of the array converge.
+	 */
 	wiiuse_rumble(wiimotes[0], 0);
 	wiiuse_rumble(wiimotes[1], 0);
 
@@ -356,7 +364,7 @@ int main(int argc, char** argv) {
 	 *	if any expansions are plugged into the wiimote or
 	 *	what LEDs are lit.
 	 */
-	//wiiuse_status(wiimotes[0]);
+	/* wiiuse_status(wiimotes[0]); */
 
 	/*
 	 *	This is the main loop
@@ -409,13 +417,17 @@ int main(int argc, char** argv) {
 						 *	threshold values.  By default they are the same
 						 *	as the wiimote.
 						 */
-						 //wiiuse_set_nunchuk_orient_threshold((struct nunchuk_t*)&wiimotes[i]->exp.nunchuk, 90.0f);
-						 //wiiuse_set_nunchuk_accel_threshold((struct nunchuk_t*)&wiimotes[i]->exp.nunchuk, 100);
+						 /* wiiuse_set_nunchuk_orient_threshold((struct nunchuk_t*)&wiimotes[i]->exp.nunchuk, 90.0f); */
+						 /* wiiuse_set_nunchuk_accel_threshold((struct nunchuk_t*)&wiimotes[i]->exp.nunchuk, 100); */
 						printf("Nunchuk inserted.\n");
 						break;
 
 					case WIIUSE_CLASSIC_CTRL_INSERTED:
 						printf("Classic controller inserted.\n");
+						break;
+
+					case WIIUSE_WII_BOARD_CTRL_INSERTED:
+						printf("Balance board controller inserted.\n");
 						break;
 
 					case WIIUSE_GUITAR_HERO_3_CTRL_INSERTED:
@@ -427,6 +439,7 @@ int main(int argc, char** argv) {
 					case WIIUSE_NUNCHUK_REMOVED:
 					case WIIUSE_CLASSIC_CTRL_REMOVED:
 					case WIIUSE_GUITAR_HERO_3_CTRL_REMOVED:
+					case WIIUSE_WII_BOARD_CTRL_REMOVED:
 						/* some expansion was removed */
 						handle_ctrl_status(wiimotes[i]);
 						printf("An expansion was removed.\n");

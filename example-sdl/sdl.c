@@ -21,29 +21,34 @@
  *	$Header$
  */
 
-#include <stdlib.h>
-#include <math.h>
+#include <wiiuse.h>
 
-#ifndef WIN32
-	#include <unistd.h>
-	#include <sys/time.h>
-	#include <time.h>
+#include <SDL.h>                        /* for SDL_Init, SDL_Quit */
+#include <SDL_error.h>                  /* for SDL_GetError */
+#include <SDL_events.h>                 /* for SDL_Event, SDL_PollEvent, etc */
+#include <SDL_video.h>                  /* for SDL_GL_SetAttribute, etc */
+
+#ifndef WIIUSE_MAC
+	#include <GL/gl.h>                      /* for glVertex3f, GLfloat, etc */
+	#include <GL/glu.h>                     /* for gluLookAt, gluOrtho2D, etc */
+	#include <GL/glut.h>                    /* for glutSolidTeapot */
+#else
+	/* Mac doesn't use the same folders for OpenGL/GLUT includes */
+	#include <OpenGL/gl.h>                  /* for glVertex3f, GLfloat, etc */
+	#include <OpenGL/glu.h>                 /* for gluLookAt, gluOrtho2D, etc */
+	#include <GLUT/GLUT.h>                  /* for glutSolidTeapot */
+#endif
+
+
+#ifndef WIIUSE_WIN32
+	#include <sys/time.h>                   /* for timeval, gettimeofday */
+	#include <time.h>                       /* for time */
+	#include <unistd.h>                     /* for usleep */
 #else
 	#include <windows.h>
 #endif
 
-#ifndef __APPLE__
-	#include <GL/gl.h>
-	#include <GL/glu.h>
-	#include <GL/glut.h>
-#else
-	#include <OpenGL/gl.h>
-	#include <OpenGL/glu.h>
-	#include <GLUT/GLUT.h>
-#endif
-#include <SDL.h>
-
-#include <wiiuse.h>
+#include <stdio.h>                      /* for printf */
 
 #define PI 3.14159265358979323846
 #define PI_DIV_180 0.017453292519943296
@@ -329,7 +334,7 @@ int WINAPI WinMain(HINSTANCE hInstance,	HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	int found, connected;
 	int wm;
 
-	//printf("wiiuse version = %s\n", wiiuse_version());
+	/* printf("wiiuse version = %s\n", wiiuse_version()); */
 
 	wiimotes =  wiiuse_init(MAX_WIIMOTES);
 	found = wiiuse_find(wiimotes, MAX_WIIMOTES, 5);

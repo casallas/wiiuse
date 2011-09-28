@@ -31,14 +31,26 @@
  *	@brief Handles device I/O for Windows.
  */
 
-#ifdef WIN32
 
 #include "io.h"
 
+#ifdef WIIUSE_WIN32
 #include <stdlib.h>
 
 #include <hidsdi.h>
 #include <setupapi.h>
+
+#ifdef __MINGW32__
+/* this prototype is missing from the mingw headers so we must add it
+	or suffer linker errors. */
+#	ifdef __cplusplus
+extern "C" {
+#	endif
+	WINHIDSDI BOOL WINAPI HidD_SetOutputReport(HANDLE, PVOID, ULONG);
+#	ifdef __cplusplus
+}
+#	endif
+#endif
 
 int wiiuse_find(struct wiimote_t** wm, int max_wiimotes, int timeout) {
 	GUID device_id;
@@ -51,7 +63,7 @@ int wiiuse_find(struct wiimote_t** wm, int max_wiimotes, int timeout) {
 	HIDD_ATTRIBUTES	attr;
 	int found = 0;
 
-	(void) timeout; // unused
+	(void) timeout; /* unused */
 
 	device_data.cbSize = sizeof(device_data);
 	index = 0;
@@ -75,7 +87,7 @@ int wiiuse_find(struct wiimote_t** wm, int max_wiimotes, int timeout) {
 
 		/* get the size of the data block required */
 		i = SetupDiGetDeviceInterfaceDetail(device_info, &device_data, NULL, 0, &len, NULL);
-		detail_data = malloc(len);
+		detail_data = (SP_DEVICE_INTERFACE_DETAIL_DATA_A*)malloc(len);
 		detail_data->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
 
 		/* query the data for this device */
@@ -241,4 +253,16 @@ int wiiuse_io_write(struct wiimote_t* wm, byte* buf, int len) {
 	return 0;
 }
 
-#endif /* ifdef WIN32 */
+void wiiuse_init_platform_fields(struct wiimote_t* wm) {
+	wm->dev_handle = 0;
+	wm->stack = WIIUSE_STACK_UNKNOWN;
+	wm->normal_timeout = WIIMOTE_DEFAULT_TIMEOUT;
+	wm->exp_timeout = WIIMOTE_EXP_TIMEOUT;
+	wm->timeout = wm->normal_timeout;
+}
+
+void wiiuse_cleanup_platform_fields(struct wiimote_t* wm) {
+	wm->dev_handle = 0;
+}
+
+#endif /* ifdef WIIUSE_WIN32 */

@@ -38,7 +38,11 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+//Useful and necessary to avoid leaks in some methods
+#import <Foundation/NSAutoreleasePool.h>
+
 #define BLUETOOTH_VERSION_USE_CURRENT
+//For the Objective-C Bluetooth classes
 #import <IOBluetooth/IOBluetooth.h>
 
 #define MAX_WIIMOTES 4
@@ -81,11 +85,11 @@ wiimote * g_wiimotes[MAX_WIIMOTES] = {NULL, NULL, NULL, NULL};
 	IOBluetoothDevice *device = [l2capChannel getDevice];
 	wiimote *wm = NULL;
 	int i;
-
 	for (i = 0; i < MAX_WIIMOTES; i++) {
 		if (g_wiimotes[i] == NULL)
 			continue;
-		if ([device isEqual: g_wiimotes[i]->btd] == TRUE)
+		//wm contain device refs and not devices, so we need to cast them before comparing
+		if ([device isEqual: [IOBluetoothDevice withDeviceRef:g_wiimotes[i]->btd]] == TRUE)
 			wm = g_wiimotes[i];
 	}
 
@@ -130,7 +134,8 @@ wiimote * g_wiimotes[MAX_WIIMOTES] = {NULL, NULL, NULL, NULL};
 	for (i = 0; i < MAX_WIIMOTES; i++) {
 		if (g_wiimotes[i] == NULL)
 			continue;
-		if ([device isEqual: g_wiimotes[i]->btd] == TRUE)
+		//wm contain device refs and not devices, so we need to cast them before comparing
+		if ([device isEqual: [IOBluetoothDevice withDeviceRef:g_wiimotes[i]->btd]] == TRUE)
 			wm = g_wiimotes[i];
 	}
 
@@ -140,18 +145,19 @@ wiimote * g_wiimotes[MAX_WIIMOTES] = {NULL, NULL, NULL, NULL};
 	}
 	else{
 		//TODO Not sure if this should disconnect the wiimote or just set channels to nil
-		//wiiuse_disconnect(wm);
+		wiiuse_disconnect(wm);
 
-		if (l2capChannel == wm->cchan)
+		//wm contain l2capchannelrefs refs and not l2capchannels, so we need to cast them before comparing
+		/*if ([l2capChannel isEqual: [IOBluetoothL2CAPChannel withL2CAPChannelRef:wm->cchan]])
 		{
 			wm->cchan = nil;
 			WIIUSE_WARNING("Lost control channel to wiimote %i", wm->unid);
 		}
-		if (l2capChannel == wm->ichan)
+		if ([l2capChannel isEqual: [IOBluetoothL2CAPChannel withL2CAPChannelRef:wm->ichan]])
 		{
 			wm->ichan = nil;
 			WIIUSE_WARNING("Lost input channel to wiimote %i", wm->unid);
-		}
+		}*/
 	}
 	
 }
@@ -176,6 +182,10 @@ static int wiiuse_connect_single(struct wiimote_t* wm, char* address);
  *	devices.
  */
 int wiiuse_find(struct wiimote_t** wm, int max_wiimotes, int timeout) {
+	/* We will run some unhandled code here with CFRunLoopRun that needs autorelease
+	 * This also allows us to initialize objects with autorelease */
+	NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+	
 	IOBluetoothHostController *bth;
 	IOBluetoothDeviceInquiry *bti;
 	SearchBT *sbt;
@@ -188,16 +198,17 @@ int wiiuse_find(struct wiimote_t** wm, int max_wiimotes, int timeout) {
 		if (wm[i] && wm[i]->btd)//check if we've already initialized the bluetooth device
 			found_wiimotes++;
 
-	bth = [[IOBluetoothHostController alloc] init];
+	bth = [[[IOBluetoothHostController alloc] init] autorelease];
 	if ([bth addressAsString] == nil) {
 		WIIUSE_ERROR("No bluetooth host controller");
 		[bth release];
 		return found_wiimotes;
 	}
 
-	sbt = [[SearchBT alloc] init];
+	sbt = [[[SearchBT alloc] init] autorelease];
 	sbt->maxDevices = max_wiimotes - found_wiimotes;
-	bti = [[IOBluetoothDeviceInquiry alloc] init];
+	
+	bti = [[[IOBluetoothDeviceInquiry alloc] init] autorelease];
 	[bti setDelegate: sbt];
 	[bti setInquiryLength: 5];
 	[bti setSearchCriteria: kBluetoothServiceClassMajorAny
@@ -224,18 +235,17 @@ int wiiuse_find(struct wiimote_t** wm, int max_wiimotes, int timeout) {
 	
 	for (i=0; (i < found_devices) && (found_wiimotes < max_wiimotes); ++i) {
 			/* found a device */
-			wm[found_wiimotes]->btd = [en nextObject];
+			wm[found_wiimotes]->btd = [[en nextObject] getDeviceRef];//Convert it to device ref to store it in the wm
 
 			WIIUSE_INFO("Found wiimote (%s) [id %i].",
-				[[wm[found_wiimotes]->btd getAddressString] UTF8String],
+				[[[IOBluetoothDevice withDeviceRef: wm[found_wiimotes]->btd] getAddressString] UTF8String],
 				wm[found_wiimotes]->unid);
 
 			WIIMOTE_ENABLE_STATE(wm[found_wiimotes], WIIMOTE_STATE_DEV_FOUND);
 			++found_wiimotes;
 	}
-	[bth release];
-	[bti release];
-	[sbt release];
+	
+	[pool drain];
 
 	return found_wiimotes;
 }
@@ -284,17 +294,31 @@ int wiiuse_connect(struct wiimote_t** wm, int wiimotes) {
  *	@return 1 on success, 0 on failure
  */
 static int wiiuse_connect_single(struct wiimote_t* wm, char* address) {
-
+	/* We will run some code here that needs autorelease, probably when openning the channels
+	 * This also allows us to initialize objects with autorelease */
+	NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+	
 	if (!wm || WIIMOTE_IS_CONNECTED(wm))
 		return 0;
 
 	int i;
-	ConnectBT *cbt = [[ConnectBT alloc] init];
-	[wm->btd openL2CAPChannelSync: &wm->cchan
+	ConnectBT *cbt = [[[ConnectBT alloc] init] autorelease];
+	
+	//Convert from DeviceRef to Device before opening the channels
+	IOBluetoothDevice* device =[IOBluetoothDevice withDeviceRef:wm->btd];
+	
+	//Convert from L2CAPChannelRef to L2CAPChannel (this isn't really necessary)
+	IOBluetoothL2CAPChannel* cchan=[IOBluetoothL2CAPChannel withL2CAPChannelRef:wm->cchan];
+	IOBluetoothL2CAPChannel* ichan=[IOBluetoothL2CAPChannel withL2CAPChannelRef:wm->ichan];
+	
+	[device openL2CAPChannelSync: &cchan
 		withPSM: kBluetoothL2CAPPSMHIDControl delegate: cbt];
 	
-	[wm->btd openL2CAPChannelSync: &wm->ichan
+	[device openL2CAPChannelSync: &ichan
 		withPSM: kBluetoothL2CAPPSMHIDInterrupt delegate: cbt];
+	
+	wm->cchan = [cchan getL2CAPChannelRef];
+	wm->ichan = [ichan getL2CAPChannelRef];
 	
 	if (wm->cchan == nil || wm->ichan == nil) {
 		WIIUSE_ERROR("Unable to open L2CAP channels "
@@ -318,7 +342,7 @@ static int wiiuse_connect_single(struct wiimote_t* wm, char* address) {
 
 	wiiuse_set_report_type(wm);
 
-	[cbt release];
+	[pool drain];
 	return 1;
 }
 
@@ -341,18 +365,21 @@ void wiiuse_disconnect(struct wiimote_t* wm) {
 			g_wiimotes[i] = NULL;
 	}
 	if (wm->cchan!=nil) {
-		[wm->cchan setDelegate:nil];
-		[wm->cchan closeChannel];
+		IOBluetoothL2CAPChannel* cchan = [IOBluetoothL2CAPChannel withL2CAPChannelRef:wm->cchan];
+		[cchan setDelegate:nil];
+		[cchan closeChannel];
 		wm->cchan = nil;
 	}
 	if (wm->ichan!=nil) {
-		[wm->ichan setDelegate:nil];
-		[wm->ichan closeChannel];
+		IOBluetoothL2CAPChannel* ichan = [IOBluetoothL2CAPChannel withL2CAPChannelRef:wm->ichan];
+		[ichan setDelegate:nil];
+		[ichan closeChannel];
 		wm->ichan = nil;
 	}
 	if (wm->btd!=nil) {
-		[wm->btd closeConnection];
-		[wm->btd release];
+		IOBluetoothDevice* device = [IOBluetoothDevice withDeviceRef:wm->btd];
+		[device closeConnection];
+		[device release];
 		wm->btd = nil;
 	}
 
@@ -364,6 +391,8 @@ void wiiuse_disconnect(struct wiimote_t* wm) {
 
 
 int wiiuse_io_read(struct wiimote_t* wm) {
+	/* We will run some unhandled code here with CFRunLoopRun that needs autorelease */
+	NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
 	int bytes;
 	
 	if (!WIIMOTE_IS_CONNECTED(wm))
@@ -384,6 +413,7 @@ int wiiuse_io_read(struct wiimote_t* wm) {
 	if (wm->event_buf[0] == '\0')
 		bytes = 0;
 	
+	[pool drain];
 	return bytes;
 }
 
@@ -394,7 +424,8 @@ int wiiuse_io_write(struct wiimote_t* wm, byte* buf, int len) {
 	if (!wm || !WIIMOTE_IS_CONNECTED(wm))
 		return 0;
 
-	ret = [wm->cchan writeAsync: buf length: len refcon: nil];
+	//Convert from l2CapChannelRef to l2capChannel before writing
+	ret = [[IOBluetoothL2CAPChannel withL2CAPChannelRef:wm->cchan] writeAsync: buf length: len refcon: nil];
 
 	if (ret == kIOReturnSuccess)
 		return len;
@@ -402,6 +433,20 @@ int wiiuse_io_write(struct wiimote_t* wm, byte* buf, int len) {
 		return 0;
 }
 
+void wiiuse_init_platform_fields(struct wiimote_t* wm) {
+	wm->btd = nil;
+	wm->ichan = nil;
+	wm->cchan = nil;
+	wm->inputlen = 0;
+}
+
+void wiiuse_cleanup_platform_fields(struct wiimote_t* wm) {
+	/* TODO isn't this already done in wiiuse_disconnect ? */
+	wm->cchan = nil;
+	wm->ichan = nil;
+	wm->btd = nil;
+	wm->inputlen = 0;
+}
 
 
 #endif /* ifdef __APPLE__ */

@@ -1,11 +1,7 @@
 /*
  *	wiiuse
  *
- *	Written By:
- *		Michael Laforest	< para >
- *		Email: < thepara (--AT--) g m a i l [--DOT--] com >
- *
- *	Copyright 2006-2007
+ *  Copyright 2011 Iowa State University Virtual Reality Applications Center
  *
  *	This file is part of wiiuse.
  *
@@ -28,34 +24,26 @@
 
 /**
  *	@file
- *	@brief Handles IR data.
+ *	@brief Provides platform-specific utility functions.
  */
 
-#ifndef IR_H_INCLUDED
-#define IR_H_INCLUDED
 
 #include "wiiuse_internal.h"
 
-#define WII_VRES_X		560
-#define WII_VRES_Y		340
+#ifdef WIIUSE_WIN32
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <windows.h>
 
-
-/** @defgroup internal_ir Internal: IR Sensor */
-/** @{ */
-void wiiuse_set_ir_mode(struct wiimote_t *wm);
-void calculate_basic_ir(struct wiimote_t* wm, byte* data);
-void calculate_extended_ir(struct wiimote_t* wm, byte* data);
-float calc_yaw(struct ir_t* ir);
-/** @} */
-
-#ifdef __cplusplus
+void wiiuse_millisleep(int durationMilliseconds) {
+	Sleep(durationMilliseconds);
 }
-#endif
 
-#endif /* IR_H_INCLUDED */
+#else /* not win32 - assuming posix */
 
+#include <unistd.h>                     /* for usleep */
 
+void wiiuse_millisleep(int durationMilliseconds) {
+	usleep(durationMilliseconds * 1000);
+}
+
+#endif /* ifdef WIIUSE_WIN32 */

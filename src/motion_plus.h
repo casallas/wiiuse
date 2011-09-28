@@ -2,12 +2,14 @@
  *	wiiuse
  *
  *	Written By:
- *		Michael Laforest	< para >
- *		Email: < thepara (--AT--) g m a i l [--DOT--] com >
+ *		Michal Wiedenbauer	< shagkur >
+ *		Dave Murphy			< WinterMute >
+ *		Hector Martin		< marcan >
+ * 		Radu Andries		<admiral0>
  *
- *	Copyright 2006-2007
+ *	Copyright 2009
  *
- *	This file is part of wiiuse.
+ *	This file is part of wiiuse and fWIIne.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -25,37 +27,32 @@
  *	$Header$
  *
  */
-
-/**
+ /**
  *	@file
- *	@brief Handles IR data.
+ *	@brief Motion plus extension
  */
 
-#ifndef IR_H_INCLUDED
-#define IR_H_INCLUDED
+#ifndef MOTION_PLUS_H_INCLUDED
+#define MOTION_PLUS_H_INCLUDED
 
 #include "wiiuse_internal.h"
-
-#define WII_VRES_X		560
-#define WII_VRES_Y		340
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-
-/** @defgroup internal_ir Internal: IR Sensor */
+/** @defgroup internal_mp Internal: MotionPlus */
 /** @{ */
-void wiiuse_set_ir_mode(struct wiimote_t *wm);
-void calculate_basic_ir(struct wiimote_t* wm, byte* data);
-void calculate_extended_ir(struct wiimote_t* wm, byte* data);
-float calc_yaw(struct ir_t* ir);
+void motion_plus_disconnected(struct motion_plus_t* mp);
+
+void motion_plus_event(struct motion_plus_t* mp, int exp_type, byte* msg);
+
+void wiiuse_motion_plus_handshake(struct wiimote_t *wm, byte *data,unsigned short len);
+
 /** @} */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* IR_H_INCLUDED */
-
-
+#endif

@@ -44,13 +44,34 @@
 #ifndef WIIUSE_INTERNAL_H_INCLUDED
 #define WIIUSE_INTERNAL_H_INCLUDED
 
-#ifdef WIN32
-	#include <Winsock2.h>
-#else
+#ifndef WIIUSE_PLATFORM
+	#if defined(_WIN32)
+		#define WIIUSE_PLATFORM
+		#define WIIUSE_WIN32
+	#elif defined(__linux)
+		#define WIIUSE_PLATFORM
+		#define WIIUSE_BLUEZ
+	#elif defined(__APPLE__)
+		#define WIIUSE_PLATFORM
+		#define WIIUSE_MAC
+	#else
+		#error "Platform not yet supported!"
+	#endif
+#endif
+
+#ifdef WIIUSE_WIN32
+	#include <winsock2.h>
+#endif
+#ifdef WIIUSE_BLUEZ
 	#include <arpa/inet.h>				/* htons() */
 	#ifndef __APPLE__
 		#include <bluetooth/bluetooth.h>
 	#endif
+#endif
+#ifdef WIIUSE_MAC
+	/* mac */
+	#include <CoreFoundation/CoreFoundation.h>		/*CFRunLoops and CFNumberRef in Bluetooth classes*/
+	#include <IOBluetooth/IOBluetoothUserLib.h>		/*IOBluetoothDeviceRef and IOBluetoothL2CAPChannelRef*/
 #endif
 
 #include "definitions.h"
@@ -71,6 +92,9 @@
  *
  ********************/
 
+
+/** @addtogroup internal_general Internal: API for General Internal Use */
+/** @{ */
 /* Communication channels */
 #define WM_OUTPUT_CHANNEL			0x11
 #define WM_INPUT_CHANNEL			0x13
@@ -115,25 +139,18 @@
 /* offsets in wiimote memory */
 #define WM_MEM_OFFSET_CALIBRATION	0x16
 #define WM_EXP_MEM_BASE				0x04A40000
+#define WM_EXP_ID				0x04A400FA
 #define WM_EXP_MEM_ENABLE			0x04A40040
+#define WM_EXP_MEM_ENABLE1			0x04A400F0
+#define WM_EXP_MEM_ENABLE2			0x04A400FB
 #define WM_EXP_MEM_CALIBR			0x04A40020
-
-#define WM_REG_IR					0x04B00030
+#define WM_EXP_MOTION_PLUS_ENABLE   		0x04A600FE
+#define WM_EXP_MOTION_PLUS_INIT     0x04A600F0
+#define WM_REG_IR				0x04B00030
 #define WM_REG_IR_BLOCK1			0x04B00000
 #define WM_REG_IR_BLOCK2			0x04B0001A
 #define WM_REG_IR_MODENUM			0x04B00033
 
-/* ir block data */
-#define WM_IR_BLOCK1_LEVEL1			"\x02\x00\x00\x71\x01\x00\x64\x00\xfe"
-#define WM_IR_BLOCK2_LEVEL1			"\xfd\x05"
-#define WM_IR_BLOCK1_LEVEL2			"\x02\x00\x00\x71\x01\x00\x96\x00\xb4"
-#define WM_IR_BLOCK2_LEVEL2			"\xb3\x04"
-#define WM_IR_BLOCK1_LEVEL3			"\x02\x00\x00\x71\x01\x00\xaa\x00\x64"
-#define WM_IR_BLOCK2_LEVEL3			"\x63\x03"
-#define WM_IR_BLOCK1_LEVEL4			"\x02\x00\x00\x71\x01\x00\xc8\x00\x36"
-#define WM_IR_BLOCK2_LEVEL4			"\x35\x03"
-#define WM_IR_BLOCK1_LEVEL5			"\x07\x00\x00\x71\x01\x00\x72\x00\x20"
-#define WM_IR_BLOCK2_LEVEL5			"\x1f\x03"
 
 #define WM_IR_TYPE_BASIC			0x01
 #define WM_IR_TYPE_EXTENDED			0x03
@@ -159,11 +176,14 @@
  *	Expansion stuff
  */
 
-/* encrypted expansion id codes (located at 0x04A400FC) */
-#define EXP_ID_CODE_NUNCHUK					0x9A1EFEFE
-#define EXP_ID_CODE_WII_BOARD				0xA4200402
-#define EXP_ID_CODE_CLASSIC_CONTROLLER		0x9A1EFDFD
-#define EXP_ID_CODE_GUITAR					0x9A1EFDFB
+/* decrypted expansion id codes (located at 0x04A400FC) */
+#define EXP_ID_CODE_NUNCHUK                 0xA4200000
+#define EXP_ID_CODE_WII_BOARD               0xA4200402
+#define EXP_ID_CODE_CLASSIC_CONTROLLER      0xA4200101
+#define EXP_ID_CODE_GUITAR                  0xA4200103
+#define EXP_ID_CODE_MOTION_PLUS             0xa4200405
+#define EXP_ID_CODE_MOTION_PLUS_NUNCHUK     0xA4200505 /** Motion Plus ID in Nunchuck passthrough mode */
+#define EXP_ID_CODE_MOTION_PLUS_CLASSIC     0xA4200705 /** Motion Plus ID in Classic control. passthrough */
 
 #define EXP_HANDSHAKE_LEN					224
 
@@ -188,6 +208,11 @@
 #define WIIMOTE_STATE_IR_SENS_LVL3			0x0800
 #define WIIMOTE_STATE_IR_SENS_LVL4			0x1000
 #define WIIMOTE_STATE_IR_SENS_LVL5			0x2000
+#define WIIMOTE_STATE_EXP_HANDSHAKE        0x10000 /* actual M+ connection exists but no handshake yet */
+#define WIIMOTE_STATE_EXP_EXTERN           0x20000 /* actual M+ connection exists but handshake failed */
+#define WIIMOTE_STATE_EXP_FAILED           0x40000 /* actual M+ connection exists but handshake failed */
+
+
 
 #define WIIMOTE_INIT_STATES					(WIIMOTE_STATE_IR_SENS_LVL3)
 
@@ -219,26 +244,180 @@
 #define SMOOTH_ROLL						0x01
 #define SMOOTH_PITCH					0x02
 
+/** @} */
 #include "wiiuse.h"
-
+/** @addtogroup internal_general */
+/** @{ */
 #define _STRINGIFY(s) _STRINGIFY_IMPL(s)
 #define _STRINGIFY_IMPL(s) #s
 
 /* wiiuse version, from public per-component version defines */
 #define WIIUSE_VERSION _STRINGIFY(WIIUSE_MAJOR) "." _STRINGIFY(WIIUSE_MINOR) "." _STRINGIFY(WIIUSE_MICRO)
 
+#ifdef _MSC_VER
+#	define INLINE_UTIL __inline
+#else
+#	define INLINE_UTIL static inline
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* not part of the api */
+
+/** @brief Cross-platform call to sleep for at least the specified number
+ * of milliseconds.
+ *
+ * Use instead of Sleep(), usleep(), or similar functions.
+ * Defined in util.c
+ */
+void wiiuse_millisleep(int durationMilliseconds);
+
 int wiiuse_set_report_type(struct wiimote_t* wm);
 void wiiuse_send_next_pending_read_request(struct wiimote_t* wm);
+void wiiuse_send_next_pending_write_request(struct wiimote_t* wm);
 int wiiuse_send(struct wiimote_t* wm, byte report_type, byte* msg, int len);
 int wiiuse_read_data_cb(struct wiimote_t* wm, wiiuse_read_cb read_cb, byte* buffer, unsigned int offset, uint16_t len);
+int wiiuse_write_data_cb(struct wiimote_t *wm, unsigned int addr, byte* data, byte len, wiiuse_write_cb write_cb);
+
+
+#ifdef WIIUSE_DOXYGEN_PARSING
+/** @addtogroup betosystem Big-endian buffer to system-byte-order value
+	@{ */
+
+/** @brief Given a buffer buf, copy and return a value of type uint8_t.
+*/
+uint8_t from_big_endian_uint8_t(byte * buf);
+/** @brief Given a buffer buf, copy out a uint16_t, convert it from big-endian
+	to system byte order, and return it.
+
+	@note Requires that at least 2 bytes be available in buf, but does not
+	check this - it is your responsibility.
+*/
+uint16_t from_big_endian_uint16_t(byte * buf);
+
+/** @brief Given a buffer buf, copy out a uint32_t, convert it from big-endian
+	to system byte order, and return it.
+
+	@note Requires that at least 4 bytes be available in buf, but does not
+	check this - it is your responsibility.
+*/
+uint32_t from_big_endian_uint32_t(byte * buf);
+/** @} */
+
+/** @addtogroup systemtobe System-byte-order value to big-endian buffer
+	@{
+*/
+
+/** @brief Copies the value val into the buffer buf.
+	@note Requires that at least 1 byte is available in buf, but does not
+	check this - it is your responsibility.
+*/
+void to_big_endian_uint8_t(byte * buf, uint8_t val);
+
+/** @brief Converts the value val from system byte order to big endian,
+	and copies it into the given buffer starting at buf.
+
+	@note Requires that at least 2 bytes be available in buf, but does not
+	check this - it is your responsibility.
+*/
+void to_big_endian_uint16_t(byte * buf, uint16_t val);
+
+/** @brief Converts the value val from system byte order to big endian,
+	and copies it into the given buffer starting at buf.
+
+	@note Requires that at least 4 bytes be available in buf, but does not
+	check this - it is your responsibility.
+*/
+void to_big_endian_uint32_t(byte * buf, uint32_t val);
+/** @}
+*/
+
+/** @addtogroup bufferfunc Buffering functions
+	@brief These wrap around from/to_big_endian_TYPE, but take a byte** so that
+	they can advance the input/output pointer appropriately.
+	@{
+*/
+/** @brief Converts the value val from system byte order to big endian,
+	copies it into the given buffer starting at *buf, and advances buf by
+	sizeof(uint16_t).
+*/
+void buffer_big_endian_uint16_t(byte ** buf, uint16_t val);
+
+/** @brief Given the address of a buffer pointer buf, copy out a uint16_t
+	from *buf, convert it from big-endian to system byte order, advance
+	buf by sizeof(uint16_t), and return the value retrieved.
+*/
+uint16_t unbuffer_big_endian_uint16_t(byte ** buf);
+
+/** @sa buffer_big_endian_uint16_t()
+*/
+void buffer_big_endian_uint8_t(byte ** buf, uint8_t val);
+
+/** @sa unbuffer_big_endian_uint8_t
+*/
+uint8_t unbuffer_big_endian_uint8_t(byte ** buf);
+
+/** @sa buffer_big_endian_uint16_t
+*/
+void buffer_big_endian_uint32_t(byte ** buf, uint32_t val);
+
+/** @sa unbuffer_big_endian_uint32_t
+*/
+uint8_t unbuffer_big_endian_uint32_t(byte ** buf)
+
+/** @} */
+#else /* this else is true when not in doxygen */
+
+INLINE_UTIL void to_big_endian_uint8_t(byte * buf, uint8_t val) {
+	memcpy(buf, &val, 1);
+}
+
+INLINE_UTIL uint8_t from_big_endian_uint8_t(byte * buf) {
+	uint8_t beVal;
+	memcpy(&beVal, buf, 1);
+	return beVal;
+}
+
+#define WIIUSE_DECLARE_ENDIAN_CONVERSION_OPS(_TYPE, _TOBE, _FROMBE) \
+INLINE_UTIL void to_big_endian_##_TYPE(byte * buf, _TYPE val) { \
+	_TYPE beVal = _TOBE(val); \
+	memcpy(buf, &beVal, sizeof(_TYPE)); \
+} \
+INLINE_UTIL _TYPE from_big_endian_##_TYPE(byte * buf) { \
+	_TYPE beVal; \
+	memcpy(&beVal, buf, sizeof(_TYPE)); \
+	return _FROMBE(beVal); \
+}
+
+WIIUSE_DECLARE_ENDIAN_CONVERSION_OPS(uint16_t, htons, ntohs)
+WIIUSE_DECLARE_ENDIAN_CONVERSION_OPS(uint32_t, htonl, ntohl)
+
+#undef WIIUSE_DECLARE_ENDIAN_CONVERSION_OPS
+
+#define WIIUSE_DECLARE_BUFFERING_OPS(_TYPE) \
+INLINE_UTIL void buffer_big_endian_##_TYPE (byte ** buf, _TYPE val) { \
+	to_big_endian_##_TYPE(*buf, val); \
+	*buf += sizeof(_TYPE); \
+} \
+INLINE_UTIL _TYPE unbuffer_big_endian_##_TYPE (byte ** buf) { \
+	byte * current = *buf; \
+	*buf += sizeof(_TYPE); \
+	return from_big_endian_##_TYPE(current); \
+}
+
+WIIUSE_DECLARE_BUFFERING_OPS(uint8_t)
+WIIUSE_DECLARE_BUFFERING_OPS(uint16_t)
+WIIUSE_DECLARE_BUFFERING_OPS(uint32_t)
+
+#undef WIIUSE_DECLARE_BUFFERING_OPS
+
+#endif /* not in doxygen */
 
 #ifdef __cplusplus
 }
 #endif
+/** @} */
 
 #endif /* WIIUSE_INTERNAL_H_INCLUDED */

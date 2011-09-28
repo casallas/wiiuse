@@ -44,13 +44,20 @@
 extern "C" {
 #endif
 
+
+/** @defgroup internal_io Internal: Device IO */
+/** @{ */
 void wiiuse_handshake(struct wiimote_t* wm, byte* data, uint16_t len);
+
+void wiiuse_init_platform_fields(struct wiimote_t* wm);
+void wiiuse_cleanup_platform_fields(struct wiimote_t* wm);
 
 int wiiuse_io_read(struct wiimote_t* wm);
 int wiiuse_io_write(struct wiimote_t* wm, byte* buf, int len);
+/** @} */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // CONNECT_H_INCLUDED
+#endif /* CONNECT_H_INCLUDED */

@@ -33,11 +33,11 @@
 
 #include "guitar_hero_3.h"
 
-#include "dynamics.h"
-#include "events.h"
+#include "dynamics.h"                   /* for calc_joystick_state */
+#include "events.h"                     /* for handshake_expansion */
 
-#include <stdlib.h>
-#include <math.h>
+#include <stdlib.h>                     /* for malloc */
+#include <string.h>                     /* for memset */
 
 static void guitar_hero_3_pressed_buttons(struct guitar_hero_3_t* gh3, short now);
 
@@ -103,7 +103,7 @@ int guitar_hero_3_handshake(struct wiimote_t* wm, struct guitar_hero_3_t* gh3, b
 	/* handshake done */
 	wm->exp.type = EXP_GUITAR_HERO_3;
 
-	#ifdef WIN32
+	#ifdef WIIUSE_WIN32
 	wm->timeout = WIIMOTE_DEFAULT_TIMEOUT;
 	#endif
 
@@ -135,7 +135,7 @@ void guitar_hero_3_event(struct guitar_hero_3_t* gh3, byte* msg) {
 	for (i = 0; i < 6; ++i)
 		msg[i] = (msg[i] ^ 0x17) + 0x17;
 
-	guitar_hero_3_pressed_buttons(gh3, BIG_ENDIAN_SHORT(*(short*)(msg + 4)));
+	guitar_hero_3_pressed_buttons(gh3, from_big_endian_uint16_t(msg + 4));
 
 	/* whammy bar */
 	gh3->whammy_bar = (msg[3] - GUITAR_HERO_3_WHAMMY_BAR_MIN) / (float)(GUITAR_HERO_3_WHAMMY_BAR_MAX - GUITAR_HERO_3_WHAMMY_BAR_MIN);

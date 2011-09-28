@@ -33,14 +33,11 @@
 
 
 #include "nunchuk.h"
-#include "dynamics.h"
-#include "events.h"
+#include "dynamics.h"                   /* for calc_joystick_state, etc */
+#include "events.h"                     /* for handshake_expansion */
 
-#include <stdlib.h>
-#include <math.h>
-
-
-static void nunchuk_pressed_buttons(struct nunchuk_t* nc, byte now);
+#include <stdlib.h>                     /* for malloc */
+#include <string.h>                     /* for memset */
 
 /**
  *	@brief Handle the handshake data from the nunchuk.
@@ -80,7 +77,7 @@ int nunchuk_handshake(struct wiimote_t* wm, struct nunchuk_t* nc, byte* data, un
 		 */
 		if (data[offset + 16] == 0xFF) {
 			/* get the calibration data */
-			byte* handshake_buf = malloc(EXP_HANDSHAKE_LEN * sizeof(byte));
+			byte* handshake_buf = (byte *)malloc(EXP_HANDSHAKE_LEN * sizeof(byte));
 
 			WIIUSE_DEBUG("Nunchuk handshake appears invalid, trying again.");
 			wiiuse_read_data_cb(wm, handshake_expansion, handshake_buf, WM_EXP_MEM_CALIBR, EXP_HANDSHAKE_LEN);
@@ -110,7 +107,7 @@ int nunchuk_handshake(struct wiimote_t* wm, struct nunchuk_t* nc, byte* data, un
 	/* handshake done */
 	wm->exp.type = EXP_NUNCHUK;
 
-	#ifdef WIN32
+	#ifdef WIIUSE_WIN32
 	wm->timeout = WIIMOTE_DEFAULT_TIMEOUT;
 	#endif
 
@@ -164,7 +161,7 @@ void nunchuk_event(struct nunchuk_t* nc, byte* msg) {
  *	@param nc		Pointer to a nunchuk_t structure.
  *	@param msg		The message byte specified in the event packet.
  */
-static void nunchuk_pressed_buttons(struct nunchuk_t* nc, byte now) {
+void nunchuk_pressed_buttons(struct nunchuk_t* nc, byte now) {
 	/* message is inverted (0 is active, 1 is inactive) */
 	now = ~now & NUNCHUK_BUTTON_ALL;
 

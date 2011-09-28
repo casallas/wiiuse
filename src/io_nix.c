@@ -31,17 +31,21 @@
  *	@brief Handles device I/O for *nix.
  */
 
-#ifndef WIN32
-
 #include "io.h"
 
-#include <stdlib.h>
-#include <unistd.h>
+#ifdef WIIUSE_BLUEZ
 
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/hci.h>
-#include <bluetooth/hci_lib.h>
-#include <bluetooth/l2cap.h>
+
+#include <bluetooth/bluetooth.h>        /* for ba2str, str2ba */
+#include <bluetooth/hci.h>              /* for inquiry_info */
+#include <bluetooth/hci_lib.h>          /* for hci_get_route, hci_inquiry, etc */
+#include <bluetooth/l2cap.h>            /* for sockaddr_l2 */
+
+#include <stdio.h>                      /* for perror */
+#include <string.h>                     /* for memset */
+#include <sys/socket.h>                 /* for connect, socket */
+#include <unistd.h>                     /* for close, write */
+#include <errno.h>
 
 static int wiiuse_connect_single(struct wiimote_t* wm, char* address);
 
@@ -64,18 +68,27 @@ static int wiiuse_connect_single(struct wiimote_t* wm, char* address);
 int wiiuse_find(struct wiimote_t** wm, int max_wiimotes, int timeout) {
 	int device_id;
 	int device_sock;
+	inquiry_info scan_info_arr[128];
+	inquiry_info* scan_info = scan_info_arr;
 	int found_devices;
 	int found_wiimotes;
+	int i = 0;
 
 	/* reset all wiimote bluetooth device addresses */
-	for (found_wiimotes = 0; found_wiimotes < max_wiimotes; ++found_wiimotes)
-		wm[found_wiimotes]->bdaddr = *BDADDR_ANY;
+	for (found_wiimotes = 0; found_wiimotes < max_wiimotes; ++found_wiimotes) {
+		/* bacpy(&(wm[found_wiimotes]->bdaddr), BDADDR_ANY); */
+		memset(&(wm[found_wiimotes]->bdaddr), 0, sizeof(bdaddr_t));
+	}
 	found_wiimotes = 0;
 
 	/* get the id of the first bluetooth device. */
 	device_id = hci_get_route(NULL);
 	if (device_id < 0) {
-		perror("hci_get_route");
+		if (errno == ENODEV) {
+			WIIUSE_ERROR("Could not detect a Bluetooth adapter!");
+		} else {
+			perror("hci_get_route");
+		}
 		return 0;
 	}
 
@@ -86,8 +99,6 @@ int wiiuse_find(struct wiimote_t** wm, int max_wiimotes, int timeout) {
 		return 0;
 	}
 
-	inquiry_info scan_info_arr[128];
-	inquiry_info* scan_info = scan_info_arr;
 	memset(&scan_info_arr, 0, sizeof(scan_info_arr));
 
 	/* scan for bluetooth devices for 'timeout' seconds */
@@ -99,10 +110,8 @@ int wiiuse_find(struct wiimote_t** wm, int max_wiimotes, int timeout) {
 
 	WIIUSE_INFO("Found %i bluetooth device(s).", found_devices);
 
-	int i = 0;
-
 	/* display discovered devices */
-	for (; (i < found_devices) && (found_wiimotes < max_wiimotes); ++i) {
+	for (i = 0; (i < found_devices) && (found_wiimotes < max_wiimotes); ++i) {
 		if ((scan_info[i].dev_class[0] == WM_DEV_CLASS_0) &&
 			(scan_info[i].dev_class[1] == WM_DEV_CLASS_1) &&
 			(scan_info[i].dev_class[2] == WM_DEV_CLASS_2))
@@ -173,13 +182,18 @@ static int wiiuse_connect_single(struct wiimote_t* wm, char* address) {
 		return 0;
 
 	addr.l2_family = AF_BLUETOOTH;
-
+	bdaddr_t *bdaddr = &wm->bdaddr;
 	if (address)
 		/* use provided address */
 		str2ba(address, &addr.l2_bdaddr);
 	else
+	{
+		/** @todo this line doesn't make sense
+		bacmp(bdaddr, BDADDR_ANY);*/
 		/* use address of device discovered */
-		addr.l2_bdaddr = wm->bdaddr;
+		addr.l2_bdaddr = *bdaddr;
+
+	}
 
 	/*
 	 *	OUTPUT CHANNEL
@@ -263,6 +277,17 @@ int wiiuse_io_write(struct wiimote_t* wm, byte* buf, int len) {
 	return write(wm->out_sock, buf, len);
 }
 
+void wiiuse_init_platform_fields(struct wiimote_t* wm) {
+	memset(&(wm->bdaddr), 0, sizeof(bdaddr_t)); /* = *BDADDR_ANY;*/
+	wm->out_sock = -1;
+	wm->in_sock = -1;
+}
+
+void wiiuse_cleanup_platform_fields(struct wiimote_t* wm) {
+	wm->out_sock = -1;
+	wm->in_sock = -1;
+}
 
 
-#endif /* ifndef WIN32 */
+
+#endif /* ifdef WIIUSE_BLUEZ */

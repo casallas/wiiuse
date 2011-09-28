@@ -32,11 +32,11 @@
  */
 
 #include "classic.h"
-#include "dynamics.h"
-#include "events.h"
+#include "dynamics.h"                   /* for calc_joystick_state */
+#include "events.h"                     /* for handshake_expansion */
 
-#include <stdlib.h>
-#include <math.h>
+#include <stdlib.h>                     /* for malloc */
+#include <string.h>                     /* for memset */
 
 static void classic_ctrl_pressed_buttons(struct classic_ctrl_t* cc, short now);
 
@@ -76,7 +76,7 @@ int classic_ctrl_handshake(struct wiimote_t* wm, struct classic_ctrl_t* cc, byte
 		 */
 		if (data[offset + 16] == 0xFF) {
 			/* get the calibration data */
-			byte* handshake_buf = malloc(EXP_HANDSHAKE_LEN * sizeof(byte));
+			byte* handshake_buf = (byte *)malloc(EXP_HANDSHAKE_LEN * sizeof(byte));
 
 			WIIUSE_DEBUG("Classic controller handshake appears invalid, trying again.");
 			wiiuse_read_data_cb(wm, handshake_expansion, handshake_buf, WM_EXP_MEM_CALIBR, EXP_HANDSHAKE_LEN);
@@ -105,7 +105,7 @@ int classic_ctrl_handshake(struct wiimote_t* wm, struct classic_ctrl_t* cc, byte
 	/* handshake done */
 	wm->exp.type = EXP_CLASSIC;
 
-	#ifdef WIN32
+	#ifdef WIIUSE_WIN32
 	wm->timeout = WIIMOTE_DEFAULT_TIMEOUT;
 	#endif
 
@@ -138,7 +138,7 @@ void classic_ctrl_event(struct classic_ctrl_t* cc, byte* msg) {
 	for (i = 0; i < 6; ++i)
 		msg[i] = (msg[i] ^ 0x17) + 0x17;
 
-	classic_ctrl_pressed_buttons(cc, BIG_ENDIAN_SHORT(*(short*)(msg + 4)));
+	classic_ctrl_pressed_buttons(cc, from_big_endian_uint16_t(msg + 4));
 
 	/* left/right buttons */
 	l = (((msg[2] & 0x60) >> 2) | ((msg[3] & 0xE0) >> 5));

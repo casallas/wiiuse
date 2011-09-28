@@ -37,10 +37,12 @@
 /* this is wiiuse - used to distinguish from third party programs using wiiuse.h */
 #include <stdio.h>
 #include "os.h"
+/** @addtogroup internal_general */
+/** @{ */
 
 #define WIIMOTE_PI			3.14159265f
 
-//#define WITH_WIIUSE_DEBUG
+/* #define WITH_WIIUSE_DEBUG */
 
 extern FILE* logtarget[];
 
@@ -59,7 +61,7 @@ extern FILE* logtarget[];
 #define WIIUSE_INFO(fmt, ...)		do { if (OUTF_INFO) fprintf(OUTF_INFO, "[INFO] " fmt "\n", ##__VA_ARGS__); } while(0)
 
 #ifdef WITH_WIIUSE_DEBUG
-	#ifdef WIN32
+	#ifdef WIIUSE_WIN32
 		#define WIIUSE_DEBUG(fmt, ...)		do {																					\
 												if (OUTF_DEBUG) {																	\
 													char* file = __FILE__;															\
@@ -79,12 +81,12 @@ extern FILE* logtarget[];
 #define RAD_TO_DEGREE(r)	((r * 180.0f) / WIIMOTE_PI)
 #define DEGREE_TO_RAD(d)	(d * (WIIMOTE_PI / 180.0f))
 
-/* Convert to big endian */
-#define BIG_ENDIAN_LONG(i)				(htonl(i))
-#define BIG_ENDIAN_SHORT(i)				(htons(i))
-
 #define absf(x)						((x >= 0) ? (x) : (x * -1.0f))
 #define diff_f(x, y)				((x >= y) ? (absf(x - y)) : (absf(y - x)))
 
 #define WCONST
-#endif // DEFINITIONS_H_INCLUDED
+
+
+/** @} */
+
+#endif /* DEFINITIONS_H_INCLUDED */
