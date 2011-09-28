@@ -39,7 +39,6 @@
 	#include <GLUT/GLUT.h>                  /* for glutSolidTeapot */
 #endif
 
-
 #ifndef WIIUSE_WIN32
 	#include <sys/time.h>                   /* for timeval, gettimeofday */
 	#include <time.h>                       /* for time */

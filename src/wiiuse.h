@@ -715,7 +715,7 @@ typedef struct wiimote_t {
 	#endif
 	
 	#ifdef WIIUSE_MAC
-	/** @name Windows-specific members */
+	/** @name Mac OS X-specific members */
 	/** @{ */	
 		IOBluetoothDeviceRef btd;			/**< Bluetooth device						*/
 		IOBluetoothL2CAPChannelRef ichan;	/**< Bluetooth input channel				*/
